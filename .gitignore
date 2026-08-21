@@ -1,0 +1,14 @@
+# Dependencies and generated files
+**/node_modules/
+**/dist/
+*.log
+
+# Secrets and local environment configuration
+**/.env
+**/.env.*
+!**/.env.example
+
+# OS and editor files
+.DS_Store
+.vscode/
+.idea/
