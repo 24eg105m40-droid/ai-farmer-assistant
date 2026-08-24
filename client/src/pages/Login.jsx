@@ -1,6 +1,6 @@
 import { useState } from "react";
-import api from "../api";
 import { useNavigate } from "react-router-dom";
+import api from "../api";
 
 function Login() {
   const navigate = useNavigate();
@@ -10,151 +10,363 @@ function Login() {
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
 
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  // ===============================
+  // SEND OTP
+  // ===============================
+
   const sendOTP = async () => {
-    if (mobile.length !== 10) {
-      alert("Please enter a valid 10-digit mobile number");
+    if (!mobile || mobile.length !== 10) {
+      setMessage("Please enter a valid 10-digit mobile number.");
       return;
     }
 
     try {
+      setLoading(true);
+      setMessage("");
+
+      const response = await api.post("/api/send-otp", {
+        mobile,
+      });
+
+      // Development OTP
+      setGeneratedOtp(response.data.otp);
+
+      setOtpSent(true);
+
+      setMessage(
+        "OTP sent successfully. Check your server terminal."
+      );
+    } catch (error) {
+      console.error("OTP error:", error);
+
+      setMessage(
+        error.response?.data?.message ||
+          "Unable to send OTP."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===============================
+  // VERIFY OTP
+  // ===============================
+
+  const verifyOTP = async () => {
+    if (!otp) {
+      setMessage("Please enter the OTP.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage("");
+
       const response = await api.post(
-        "/api/send-otp",
+        "/api/verify-otp",
         {
-          mobile: mobile,
+          mobile,
+          otp,
         }
       );
 
-      console.log(response.data);
+      if (response.data.verified) {
+        // Save mobile number
+        localStorage.setItem(
+          "farmerMobile",
+          mobile
+        );
 
-      setGeneratedOtp(response.data.otp);
-      setOtpSent(true);
+        // Save JWT token
+        localStorage.setItem(
+          "token",
+          response.data.token
+        );
 
-      alert("OTP generated! Check the backend terminal.");
+        console.log("✅ JWT token saved");
+
+        setMessage(
+          "Login successful! Redirecting..."
+        );
+
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 500);
+      }
     } catch (error) {
-      console.error(error);
-      alert("Unable to send OTP");
+      console.error(
+        "OTP verification error:",
+        error
+      );
+
+      setMessage(
+        error.response?.data?.message ||
+          "Invalid OTP."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  const verifyOTP = () => {
-    if (otp === generatedOtp.toString()) {
-      // Save farmer mobile number
-      localStorage.setItem("farmerMobile", mobile);
-
-      console.log("Farmer mobile saved:", mobile);
-
-      alert("OTP verified successfully! 🎉");
-
-      // Go to Dashboard
-      navigate("/");
-    } else {
-      alert("Incorrect OTP ❌");
-    }
-  };
+  // ===============================
+  // UI
+  // ===============================
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        background:
-          "linear-gradient(to right, #2E7D32, #81C784)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
+
+        background:
+          "linear-gradient(135deg, #e8f5e9, #f1f8e9)",
+
+        fontFamily: "Arial, sans-serif",
+        padding: "20px",
       }}
     >
       <div
         style={{
-          width: "400px",
+          width: "100%",
+          maxWidth: "430px",
+
           background: "white",
-          padding: "30px",
-          borderRadius: "15px",
-          boxShadow: "0 5px 15px rgba(0,0,0,0.3)",
+
+          borderRadius: "20px",
+
+          padding: "35px",
+
+          boxShadow:
+            "0 10px 30px rgba(0,0,0,0.12)",
         }}
       >
-        <h2
+        {/* HEADER */}
+
+        <div
           style={{
             textAlign: "center",
-            color: "#2E7D32",
+            marginBottom: "25px",
           }}
         >
-          🌾 AI Farmer Assistant
-        </h2>
+          <div
+            style={{
+              fontSize: "55px",
+            }}
+          >
+            🌾
+          </div>
 
-        <p style={{ textAlign: "center" }}>
-          Farmer Login
-        </p>
+          <h1
+            style={{
+              color: "#1b5e20",
+              marginBottom: "8px",
+            }}
+          >
+            Farmer Login
+          </h1>
+
+          <p
+            style={{
+              color: "#777",
+            }}
+          >
+            Login securely using your mobile number
+          </p>
+        </div>
+
+        {/* MOBILE */}
+
+        <label
+          style={{
+            display: "block",
+            fontWeight: "bold",
+            marginBottom: "8px",
+            color: "#333",
+          }}
+        >
+          Mobile Number
+        </label>
 
         <input
           type="tel"
-          placeholder="Enter 10-digit mobile number"
           value={mobile}
-          onChange={(e) => setMobile(e.target.value)}
-          maxLength="10"
+          onChange={(e) =>
+            setMobile(
+              e.target.value.replace(/\D/g, "")
+            )
+          }
+          maxLength={10}
+          placeholder="Enter 10-digit mobile number"
+          disabled={otpSent}
           style={{
             width: "100%",
-            padding: "12px",
-            marginTop: "15px",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
             boxSizing: "border-box",
+
+            padding: "13px",
+
+            border:
+              "1px solid #cfd8cc",
+
+            borderRadius: "9px",
+
+            fontSize: "16px",
+
+            marginBottom: "15px",
           }}
         />
+
+        {/* SEND OTP */}
 
         {!otpSent && (
           <button
             onClick={sendOTP}
+            disabled={loading}
             style={{
               width: "100%",
-              padding: "12px",
-              marginTop: "20px",
-              background: "#2E7D32",
+
+              padding: "13px",
+
+              background: "#2e7d32",
+
               color: "white",
+
               border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
+
+              borderRadius: "9px",
+
               fontSize: "16px",
+
+              fontWeight: "bold",
+
+              cursor: loading
+                ? "not-allowed"
+                : "pointer",
             }}
           >
-            Send OTP
+            {loading
+              ? "Sending..."
+              : "📱 Send OTP"}
           </button>
         )}
 
+        {/* OTP */}
+
         {otpSent && (
           <>
+            <label
+              style={{
+                display: "block",
+                fontWeight: "bold",
+                marginBottom: "8px",
+                color: "#333",
+              }}
+            >
+              Enter OTP
+            </label>
+
             <input
               type="text"
-              placeholder="Enter OTP"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              maxLength="6"
+              onChange={(e) =>
+                setOtp(
+                  e.target.value.replace(/\D/g, "")
+                )
+              }
+              maxLength={6}
+              placeholder="Enter 6-digit OTP"
               style={{
                 width: "100%",
-                padding: "12px",
-                marginTop: "20px",
-                borderRadius: "8px",
-                border: "1px solid #ccc",
                 boxSizing: "border-box",
+
+                padding: "13px",
+
+                border:
+                  "1px solid #cfd8cc",
+
+                borderRadius: "9px",
+
+                fontSize: "18px",
+
+                letterSpacing: "4px",
+
+                textAlign: "center",
+
+                marginBottom: "15px",
               }}
             />
 
             <button
               onClick={verifyOTP}
+              disabled={loading}
               style={{
                 width: "100%",
-                padding: "12px",
-                marginTop: "20px",
-                background: "#1565C0",
+
+                padding: "13px",
+
+                background: "#1565c0",
+
                 color: "white",
+
                 border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
+
+                borderRadius: "9px",
+
                 fontSize: "16px",
+
+                fontWeight: "bold",
+
+                cursor: loading
+                  ? "not-allowed"
+                  : "pointer",
               }}
             >
-              Verify OTP
+              {loading
+                ? "Verifying..."
+                : "🔐 Verify & Login"}
             </button>
           </>
+        )}
+
+        {/* MESSAGE */}
+
+        {message && (
+          <p
+            style={{
+              marginTop: "18px",
+
+              textAlign: "center",
+
+              color: "#555",
+
+              fontSize: "14px",
+            }}
+          >
+            {message}
+          </p>
+        )}
+
+        {/* DEVELOPMENT OTP */}
+
+        {generatedOtp && (
+          <p
+            style={{
+              marginTop: "12px",
+
+              textAlign: "center",
+
+              color: "#888",
+
+              fontSize: "12px",
+            }}
+          >
+            Development OTP:
+            <strong> {generatedOtp}</strong>
+          </p>
         )}
       </div>
     </div>

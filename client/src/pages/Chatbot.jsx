@@ -6,6 +6,7 @@ function Chatbot() {
   const [farmer, setFarmer] = useState(null);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
+  const [voiceLanguage, setVoiceLanguage] = useState(null);
 
   const recognitionRef = useRef(null);
 
@@ -32,7 +33,6 @@ function Chatbot() {
       .get(`/api/farmer/${mobile}`)
       .then((response) => {
         setFarmer(response.data);
-
         console.log("👨‍🌾 Farmer information:", response.data);
       })
       .catch((error) => {
@@ -55,7 +55,7 @@ function Chatbot() {
   // VOICE INPUT
   // ==========================================
 
-  const startVoiceInput = () => {
+  const startVoiceInput = (language) => {
     const SpeechRecognition =
       window.SpeechRecognition ||
       window.webkitSpeechRecognition;
@@ -67,20 +67,28 @@ function Chatbot() {
       return;
     }
 
-    if (listening) {
+    if (listening || loading) {
       return;
     }
 
     const recognition = new SpeechRecognition();
 
-    // Telugu speech recognition
-    recognition.lang = "te-IN";
+    // Set selected voice language
+    recognition.lang =
+      language === "te" ? "te-IN" : "en-IN";
 
     recognition.continuous = false;
     recognition.interimResults = false;
 
+    setVoiceLanguage(language);
+
     recognition.onstart = () => {
-      console.log("🎤 Listening for Telugu...");
+      console.log(
+        language === "te"
+          ? "🎤 Listening for Telugu..."
+          : "🎤 Listening for English..."
+      );
+
       setListening(true);
     };
 
@@ -88,7 +96,10 @@ function Chatbot() {
       const transcript =
         event.results[0][0].transcript;
 
-      console.log("🎤 Speech detected:", transcript);
+      console.log(
+        "🎤 Speech detected:",
+        transcript
+      );
 
       setMessage(transcript);
     };
@@ -100,11 +111,16 @@ function Chatbot() {
       );
 
       setListening(false);
+      setVoiceLanguage(null);
     };
 
     recognition.onend = () => {
-      console.log("🎤 Voice recognition ended");
+      console.log(
+        "🎤 Voice recognition ended"
+      );
+
       setListening(false);
+      setVoiceLanguage(null);
     };
 
     recognitionRef.current = recognition;
@@ -118,7 +134,21 @@ function Chatbot() {
       );
 
       setListening(false);
+      setVoiceLanguage(null);
     }
+  };
+
+  // ==========================================
+  // STOP VOICE
+  // ==========================================
+
+  const stopVoiceInput = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+
+    setListening(false);
+    setVoiceLanguage(null);
   };
 
   // ==========================================
@@ -130,13 +160,11 @@ function Chatbot() {
       return;
     }
 
-    // Stop previous speech
     window.speechSynthesis.cancel();
 
     const speech =
       new SpeechSynthesisUtterance(reply);
 
-    // Automatically detect response language
     const responseIsTelugu =
       isTeluguText(reply);
 
@@ -172,7 +200,6 @@ function Chatbot() {
 
     const userMessage = message.trim();
 
-    // Detect question language
     const questionIsTelugu =
       isTeluguText(userMessage);
 
@@ -188,7 +215,6 @@ function Chatbot() {
         : "English"
     );
 
-    // Display user message
     setMessages((previousMessages) => [
       ...previousMessages,
       {
@@ -205,11 +231,8 @@ function Chatbot() {
         "/api/chat",
         {
           message: userMessage,
-
-          // Farmer information
           farmer: farmer,
 
-          // Send detected language to backend
           language: questionIsTelugu
             ? "te"
             : "en",
@@ -223,7 +246,6 @@ function Chatbot() {
         botReply
       );
 
-      // Display bot response
       setMessages((previousMessages) => [
         ...previousMessages,
         {
@@ -232,7 +254,6 @@ function Chatbot() {
         },
       ]);
 
-      // Speak response in correct language
       speakResponse(botReply);
     } catch (error) {
       console.error(
@@ -308,6 +329,7 @@ function Chatbot() {
             "0 5px 20px rgba(0,0,0,0.15)",
         }}
       >
+
         {/* HEADER */}
 
         <div
@@ -346,21 +368,15 @@ function Chatbot() {
                 "1px solid #ddd",
             }}
           >
-            <span
-              style={{ margin: "0 10px" }}
-            >
+            <span style={{ margin: "0 10px" }}>
               📍 {farmer.location}
             </span>
 
-            <span
-              style={{ margin: "0 10px" }}
-            >
+            <span style={{ margin: "0 10px" }}>
               🌱 {farmer.soilType}
             </span>
 
-            <span
-              style={{ margin: "0 10px" }}
-            >
+            <span style={{ margin: "0 10px" }}>
               🌾 {farmer.crops}
             </span>
           </div>
@@ -426,88 +442,146 @@ function Chatbot() {
 
         <div
           style={{
-            display: "flex",
             padding: "20px",
-            borderTop:
-              "1px solid #ddd",
-            gap: "10px",
+            borderTop: "1px solid #ddd",
           }}
         >
-          {/* VOICE BUTTON */}
 
-          <button
-            onClick={startVoiceInput}
-            disabled={listening || loading}
+          {/* VOICE BUTTONS */}
+
+          <div
             style={{
-              padding: "14px 18px",
-              background: listening
-                ? "#c62828"
-                : "#2e7d32",
-              color: "white",
-              border: "none",
-              borderRadius: "10px",
-              cursor:
-                listening || loading
+              display: "flex",
+              gap: "10px",
+              marginBottom: "12px",
+            }}
+          >
+
+            {/* ENGLISH */}
+
+            <button
+              onClick={() =>
+                listening
+                  ? stopVoiceInput()
+                  : startVoiceInput("en")
+              }
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: "12px",
+                background:
+                  listening &&
+                  voiceLanguage === "en"
+                    ? "#c62828"
+                    : "#2e7d32",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                cursor: loading
                   ? "not-allowed"
                   : "pointer",
-              fontSize: "20px",
-              minWidth: "58px",
-            }}
-            title={
-              listening
-                ? "Listening..."
-                : "Speak in Telugu"
-            }
-          >
-            {listening ? "🔴" : "🎤"}
-          </button>
+                fontSize: "15px",
+                fontWeight: "bold",
+              }}
+            >
+              {listening &&
+              voiceLanguage === "en"
+                ? "🔴 Listening..."
+                : "🎤 English"}
+            </button>
+
+            {/* TELUGU */}
+
+            <button
+              onClick={() =>
+                listening
+                  ? stopVoiceInput()
+                  : startVoiceInput("te")
+              }
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: "12px",
+                background:
+                  listening &&
+                  voiceLanguage === "te"
+                    ? "#c62828"
+                    : "#388e3c",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                cursor: loading
+                  ? "not-allowed"
+                  : "pointer",
+                fontSize: "15px",
+                fontWeight: "bold",
+              }}
+            >
+              {listening &&
+              voiceLanguage === "te"
+                ? "🔴 వింటున్నాను..."
+                : "🎤 తెలుగు"}
+            </button>
+
+          </div>
 
           {/* TEXT INPUT */}
 
-          <input
-            type="text"
-            value={message}
-            onChange={(e) =>
-              setMessage(e.target.value)
-            }
-            onKeyDown={handleKeyDown}
-            placeholder="Ask your farming question..."
-            disabled={loading}
+          <div
             style={{
-              flex: 1,
-              padding: "14px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-              fontSize: "16px",
-              outline: "none",
-            }}
-          />
-
-          {/* SEND BUTTON */}
-
-          <button
-            onClick={sendMessage}
-            disabled={
-              loading || !message.trim()
-            }
-            style={{
-              padding: "14px 22px",
-              background:
-                loading || !message.trim()
-                  ? "#9e9e9e"
-                  : "#2e7d32",
-              color: "white",
-              border: "none",
-              borderRadius: "10px",
-              cursor:
-                loading || !message.trim()
-                  ? "not-allowed"
-                  : "pointer",
-              fontSize: "16px",
+              display: "flex",
+              gap: "10px",
             }}
           >
-            {loading ? "..." : "Send"}
-          </button>
+
+            <input
+              type="text"
+              value={message}
+              onChange={(e) =>
+                setMessage(e.target.value)
+              }
+              onKeyDown={handleKeyDown}
+              placeholder="Ask your farming question..."
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: "14px",
+                borderRadius: "10px",
+                border: "1px solid #ccc",
+                fontSize: "16px",
+                outline: "none",
+              }}
+            />
+
+            <button
+              onClick={sendMessage}
+              disabled={
+                loading ||
+                !message.trim()
+              }
+              style={{
+                padding: "14px 22px",
+                background:
+                  loading ||
+                  !message.trim()
+                    ? "#9e9e9e"
+                    : "#2e7d32",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                cursor:
+                  loading ||
+                  !message.trim()
+                    ? "not-allowed"
+                    : "pointer",
+                fontSize: "16px",
+              }}
+            >
+              {loading ? "..." : "Send"}
+            </button>
+
+          </div>
+
         </div>
 
         {/* VOICE STATUS */}
@@ -521,11 +595,15 @@ function Chatbot() {
               fontWeight: "bold",
             }}
           >
-            🎤 Listening... Speak in Telugu
+            {voiceLanguage === "te"
+              ? "🎤 తెలుగు లో మాట్లాడండి..."
+              : "🎤 Speak in English..."}
           </div>
         )}
+
       </div>
     </div>
   );
 }
+
 export default Chatbot;

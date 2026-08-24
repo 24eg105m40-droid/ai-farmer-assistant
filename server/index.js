@@ -1,19 +1,71 @@
 require("dotenv").config();
 
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
 const connectDB = require("./db");
 const Farmer = require("./models/Farmer");
+const multer = require("multer");
+const jwt = require("jsonwebtoken");
+const fs = require("fs");
+const FormData = require("form-data");
+const protect = require("./middleware/auth");
 
 const app = express();
 
-// Middleware
+const upload = multer({ dest: "uploads/" });
+
+// ===============================
+// SECURITY & MIDDLEWARE
+// ===============================
+
 const allowedOrigins = process.env.CLIENT_ORIGIN
-  ? process.env.CLIENT_ORIGIN.split(",").map((origin) => origin.trim())
+  ? process.env.CLIENT_ORIGIN
+      .split(",")
+      .map((origin) => origin.trim())
   : true;
-app.use(cors({ origin: allowedOrigins }));
+
+// CORS
+app.use(
+  cors({
+    origin: allowedOrigins,
+  })
+);
+
+// JSON
 app.use(express.json());
+
+// Helmet security headers
+app.use(helmet());
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: {
+    message: "Too many requests. Please try again later.",
+  },
+});
+
+// OTP-specific rate limiter
+const otpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: {
+    message: "Too many OTP requests. Please try again later.",
+  },
+});
+
+app.use("/api/", apiLimiter);
+
+// Apply rate limiting to API routes
+app.use("/api/", apiLimiter);
 
 
 // ===============================
@@ -26,74 +78,130 @@ app.get("/", (req, res) => {
 
 
 // ===============================
+// TEMPORARY OTP STORAGE
+// ===============================
+
+const otpStore = new Map();
+
+
+// ===============================
 // SEND OTP
 // ===============================
 
-app.post("/api/send-otp", async (req, res) => {
+app.post("/api/send-otp",otpLimiter, async (req, res) => {
   try {
     const { mobile } = req.body;
 
     if (!mobile) {
       return res.status(400).json({
-        message: "Mobile number is required"
+        message: "Mobile number is required",
       });
     }
 
-    // Temporary OTP for development
-    const otp = "123456";
+    // Generate 6-digit OTP
+    const otp = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
 
-    console.log(`OTP for ${mobile}: ${otp}`);
+    // Store OTP
+    otpStore.set(mobile, {
+      otp: otp,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    });
+
+    // Development only
+    console.log(`📱 OTP for ${mobile}: ${otp}`);
 
     res.json({
       message: "OTP sent successfully",
-      otp: otp
     });
 
   } catch (error) {
     console.error("OTP Error:", error);
 
     res.status(500).json({
-      message: "Unable to send OTP"
+      message: "Unable to send OTP",
     });
   }
 });
 
 
 // ===============================
-// VERIFY OTP
+// VERIFY OTP + CREATE JWT
 // ===============================
 
-app.post("/api/verify-otp", async (req, res) => {
+app.post("/api/verify-otp", otpLimiter, async (req, res) => {
   try {
     const { mobile, otp } = req.body;
 
     if (!mobile || !otp) {
       return res.status(400).json({
-        message: "Mobile number and OTP are required"
+        message: "Mobile number and OTP are required",
+        verified: false,
       });
     }
 
-    if (otp === "123456") {
-      return res.json({
-        message: "OTP verified successfully",
-        verified: true
+    const savedOtp = otpStore.get(mobile);
+
+    if (!savedOtp) {
+      return res.status(400).json({
+        message: "OTP not found. Please request a new OTP.",
+        verified: false,
       });
     }
 
-    res.status(400).json({
-      message: "Invalid OTP",
-      verified: false
+    // Check OTP expiry
+    if (Date.now() > savedOtp.expiresAt) {
+      otpStore.delete(mobile);
+
+      return res.status(400).json({
+        message: "OTP expired. Please request a new OTP.",
+        verified: false,
+      });
+    }
+
+    // Check OTP
+    if (otp !== savedOtp.otp) {
+      return res.status(400).json({
+        message: "Invalid OTP",
+        verified: false,
+      });
+    }
+
+    // OTP is correct
+    otpStore.delete(mobile);
+
+    // ===============================
+    // CREATE JWT
+    // ===============================
+
+    const token = jwt.sign(
+      {
+        mobile: mobile,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1d",
+      }
+    );
+
+    console.log("🔐 JWT created for:", mobile);
+
+    return res.json({
+      message: "OTP verified successfully",
+      verified: true,
+      token: token,
     });
 
   } catch (error) {
     console.error("OTP Verification Error:", error);
 
     res.status(500).json({
-      message: "OTP verification failed"
+      message: "OTP verification failed",
+      verified: false,
     });
   }
 });
-
 
 // ===============================
 // REGISTER FARMER
@@ -187,16 +295,21 @@ app.post("/api/register-farmer", async (req, res) => {
 // GET FARMER BY MOBILE
 // ===============================
 
-app.get("/api/farmer/:mobile", async (req, res) => {
+app.get("/api/farmer/:mobile", protect,async (req, res) => {
 
-  try {
-
+  try{
     const { mobile } = req.params;
 
+// Make sure the logged-in farmer can only access their own data
+if (req.user.mobile !== mobile) {
+  return res.status(403).json({
+    message: "Access denied"
+  });
+}
 
-    const farmer = await Farmer.findOne({
-      mobile: mobile
-    });
+const farmer = await Farmer.findOne({
+  mobile: mobile
+});
 
 
     if (!farmer) {
@@ -262,7 +375,7 @@ app.get("/api/weather/:city", async (req, res) => {
 });
 // ================= CHATBOT =================
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", protect,async (req, res) => {
   try {
     const { message, farmer } = req.body;
 
@@ -466,6 +579,131 @@ res.json({
     });
   }
 });
+// ===============================
+// CROP DISEASE DETECTION
+// ===============================
+
+// ===============================
+// CROP DISEASE DETECTION
+// ===============================
+
+app.post(
+  "/api/disease-detection",
+  upload.single("cropImage"),
+  protect,async (req, res) => {
+    try {
+      // Check if image was uploaded
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Please upload a crop image."
+        });
+      }
+
+      console.log(
+        "🌱 Crop image received:",
+        req.file.originalname
+      );
+
+      console.log(
+        "📁 Saved file:",
+        req.file.path
+      );
+
+      console.log(
+        "📦 File size:",
+        req.file.size
+      );
+
+      // ==========================================
+      // SEND IMAGE TO PYTHON AI SERVICE
+      // ==========================================
+
+      const formData = new FormData();
+
+      formData.append(
+        "file",
+        fs.createReadStream(req.file.path)
+      );
+
+      console.log(
+        "🤖 Sending image to Python AI..."
+      );
+
+      const aiResponse = await axios.post(
+        "http://127.0.0.1:8000/predict",
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders()
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity
+        }
+      );
+
+      console.log(
+        "🤖 AI response:",
+        aiResponse.data
+      );
+
+      // ==========================================
+      // DELETE TEMPORARY UPLOADED FILE
+      // ==========================================
+
+      fs.unlink(
+        req.file.path,
+        (error) => {
+          if (error) {
+            console.error(
+              "Could not delete temporary file:",
+              error
+            );
+          }
+        }
+      );
+
+      // ==========================================
+      // SEND AI RESULT TO REACT
+      // ==========================================
+
+      res.json({
+        success: true,
+
+        message: "Crop image analyzed successfully.",
+
+        originalName: req.file.originalname,
+
+        disease: aiResponse.data.disease,
+
+        confidence: aiResponse.data.confidence
+      });
+
+    } catch (error) {
+
+      console.error(
+        "❌ Disease detection error:",
+        error.response?.data || error.message
+      );
+
+      // Delete uploaded file if something went wrong
+      if (req.file?.path) {
+        fs.unlink(
+          req.file.path,
+          () => {}
+        );
+      }
+
+      res.status(500).json({
+        success: false,
+        message: "Failed to analyze crop image.",
+        error:
+          error.response?.data?.message ||
+          error.message
+      });
+    }
+  }
+);
 // ===============================
 // START SERVER
 // ===============================

@@ -29,8 +29,7 @@ function Register() {
       );
 
       setFarmerId(response.data.farmerId);
-      localStorage.setItem("farmerMobile", formData.mobile);
-
+      
       alert("Farmer registered successfully! 🌾");
 
     } catch (error) {
@@ -153,29 +152,46 @@ function Register() {
         </form>
 
         {farmerId && (
-          <div
-            style={{
-              marginTop: "25px",
-              padding: "15px",
-              background: "#E8F5E9",
-              borderRadius: "10px",
-              textAlign: "center"
-            }}
-          >
-            <h3>🎉 Registration Successful!</h3>
+  <div
+    style={{
+      marginTop: "25px",
+      padding: "15px",
+      background: "#E8F5E9",
+      borderRadius: "10px",
+      textAlign: "center",
+    }}
+  >
+    <h3>🎉 Registration Successful!</h3>
 
-            <p>Your Farmer ID:</p>
+    <p>Your Farmer ID:</p>
 
-            <strong
-              style={{
-                fontSize: "24px",
-                color: "#2E7D32"
-              }}
-            >
-              {farmerId}
-            </strong>
-          </div>
-        )}
+    <strong
+      style={{
+        fontSize: "24px",
+        color: "#2E7D32",
+      }}
+    >
+      {farmerId}
+    </strong>
+
+    <button
+      onClick={() => window.location.href = "/login"}
+      style={{
+        width: "100%",
+        padding: "12px",
+        marginTop: "20px",
+        background: "#1565C0",
+        color: "white",
+        border: "none",
+        borderRadius: "8px",
+        cursor: "pointer",
+        fontSize: "16px",
+      }}
+    >
+      🔐 Go to Login
+    </button>
+  </div>
+)}
 
       </div>
 
