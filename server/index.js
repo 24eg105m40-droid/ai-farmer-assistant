@@ -107,10 +107,7 @@ app.post("/api/send-otp",otpLimiter, async (req, res) => {
   expiresAt: Date.now() + 5 * 60 * 1000,
   attempts: 0,
 });
-    // Development only
-    if (process.env.NODE_ENV !== "production") {
-  console.log(`📱 OTP for ${mobile}: ${otp}`);
-}
+   console.log(`📱 OTP for ${mobile}: ${otp}`);
     res.json({
       message: "OTP sent successfully",
     });
