@@ -102,13 +102,14 @@ app.post("/api/send-otp",otpLimiter, async (req, res) => {
 
     // Store OTP
     otpStore.set(mobile, {
-      otp: otp,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    });
-
+  otp: otp,
+  expiresAt: Date.now() + 5 * 60 * 1000,
+  attempts: 0,
+});
     // Development only
-    console.log(`📱 OTP for ${mobile}: ${otp}`);
-
+    if (process.env.NODE_ENV !== "production") {
+  console.log(`📱 OTP for ${mobile}: ${otp}`);
+}
     res.json({
       message: "OTP sent successfully",
     });
@@ -158,12 +159,23 @@ app.post("/api/verify-otp", otpLimiter, async (req, res) => {
     }
 
     // Check OTP
-    if (otp !== savedOtp.otp) {
-      return res.status(400).json({
-        message: "Invalid OTP",
-        verified: false,
-      });
-    }
+if (otp !== savedOtp.otp) {
+  savedOtp.attempts += 1;
+
+  if (savedOtp.attempts >= 5) {
+    otpStore.delete(mobile);
+
+    return res.status(429).json({
+      message: "Too many incorrect OTP attempts. Please request a new OTP.",
+      verified: false,
+    });
+  }
+
+  return res.status(400).json({
+    message: "Invalid OTP",
+    verified: false,
+  });
+}
 
     // OTP is correct
     otpStore.delete(mobile);
