@@ -7,7 +7,6 @@ function Login() {
 
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -31,9 +30,7 @@ function Login() {
         mobile,
       });
 
-      // Development OTP
-      setGeneratedOtp(response.data.otp);
-
+    
       setOtpSent(true);
 
       setMessage(
@@ -347,25 +344,6 @@ function Login() {
             }}
           >
             {message}
-          </p>
-        )}
-
-        {/* DEVELOPMENT OTP */}
-
-        {generatedOtp && (
-          <p
-            style={{
-              marginTop: "12px",
-
-              textAlign: "center",
-
-              color: "#888",
-
-              fontSize: "12px",
-            }}
-          >
-            Development OTP:
-            <strong> {generatedOtp}</strong>
           </p>
         )}
       </div>
