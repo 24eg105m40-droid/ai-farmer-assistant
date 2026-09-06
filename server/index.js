@@ -23,8 +23,7 @@ const upload = multer({ dest: "uploads/" });
 // ===============================
 // SECURITY & MIDDLEWARE
 // ===============================
-
-const allowedOrigins = [
+  const allowedOrigins = [
   "https://ai-farmer-assistant-b48b97y7j-rebels9.vercel.app"
 ];
 
