@@ -24,17 +24,32 @@ const upload = multer({ dest: "uploads/" });
 // SECURITY & MIDDLEWARE
 // ===============================
 
-const allowedOrigins = process.env.CLIENT_ORIGIN
-  ? process.env.CLIENT_ORIGIN
-      .split(",")
-      .map((origin) => origin.trim())
-  : [];
-// CORS
+const allowedOrigins = [
+  "https://ai-farmer-assistant-2u6bq3rdg-rebels9.vercel.app"
+];
+
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      // Allow requests with no origin
+      // (for example, Postman or server-to-server requests)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false
   })
 );
+
+app.options("*", cors());
 
 // JSON
 app.use(express.json());
