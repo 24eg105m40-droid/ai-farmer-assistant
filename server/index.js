@@ -589,8 +589,9 @@ res.json({
 
 app.post(
   "/api/disease-detection",
+  protect,
   upload.single("cropImage"),
-  protect,async (req, res) => {
+  async (req, res) => {
     try {
       // Check if image was uploaded
       if (!req.file) {
