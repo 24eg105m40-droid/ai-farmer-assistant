@@ -25,7 +25,7 @@ const upload = multer({ dest: "uploads/" });
 // ===============================
 
 const allowedOrigins = [
-  "https://ai-farmer-assistant-2u6bq3rdg-rebels9.vercel.app"
+  "https://ai-farmer-assistant-b48b97y7j-rebels9.vercel.app"
 ];
 
 app.use(
@@ -49,7 +49,6 @@ app.use(
   })
 );
 
-app.options("*", cors());
 
 // JSON
 app.use(express.json());
