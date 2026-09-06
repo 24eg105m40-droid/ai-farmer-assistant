@@ -79,6 +79,7 @@ app.get("/", (req, res) => {
 // ===============================
 
 const otpStore = new Map();
+const verifiedRegistrationStore = new Map();
 
 
 // ===============================
@@ -179,6 +180,10 @@ if (otp !== savedOtp.otp) {
 
     // OTP is correct
     otpStore.delete(mobile);
+    // Mark mobile as verified for registration
+verifiedRegistrationStore.set(mobile, {
+  expiresAt: Date.now() + 10 * 60 * 1000,
+});
 
     // ===============================
     // CREATE JWT
@@ -218,7 +223,6 @@ if (otp !== savedOtp.otp) {
 
 app.post("/api/register-farmer", async (req, res) => {
   try {
-
     const {
       name,
       mobile,
@@ -227,34 +231,22 @@ app.post("/api/register-farmer", async (req, res) => {
       crops
     } = req.body;
 
+    const verifiedRegistration =
+      verifiedRegistrationStore.get(mobile);
 
-    // Check required fields
-
-    if (
-      !name ||
-      !mobile ||
-      !location ||
-      !soilType ||
-      !crops
-    ) {
-      return res.status(400).json({
-        message: "Please fill all fields"
+    if (!verifiedRegistration) {
+      return res.status(403).json({
+        message: "Please verify your mobile number with OTP before registering."
       });
     }
 
+    if (Date.now() > verifiedRegistration.expiresAt) {
+      verifiedRegistrationStore.delete(mobile);
 
-    // Check if farmer already exists
-
-    const existingFarmer = await Farmer.findOne({
-      mobile: mobile
-    });
-
-    if (existingFarmer) {
-      return res.status(400).json({
-        message: "Farmer with this mobile number already exists"
+      return res.status(403).json({
+        message: "Registration verification expired. Please verify your mobile number again."
       });
     }
-
 
     // Generate unique Farmer ID
 
@@ -277,6 +269,8 @@ app.post("/api/register-farmer", async (req, res) => {
     // Save to MongoDB
 
     await farmer.save();
+    // Registration verification has been used
+verifiedRegistrationStore.delete(mobile);
 
 
     console.log("✅ Farmer registered:", farmerId);
