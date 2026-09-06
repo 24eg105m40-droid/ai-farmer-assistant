@@ -337,7 +337,7 @@ const farmer = await Farmer.findOne({
 });
 
 // Weather API
-app.get("/api/weather/:city", async (req, res) => {
+app.get("/api/weather/:city", protect, async (req, res) => {
   try {
     const { city } = req.params;
 
