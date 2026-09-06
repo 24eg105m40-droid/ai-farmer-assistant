@@ -12,6 +12,9 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const FormData = require("form-data");
 const protect = require("./middleware/auth");
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET is missing from environment variables");
+}
 
 const app = express();
 
@@ -25,8 +28,7 @@ const allowedOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN
       .split(",")
       .map((origin) => origin.trim())
-  : true;
-
+  : [];
 // CORS
 app.use(
   cors({
@@ -63,11 +65,6 @@ const otpLimiter = rateLimit({
 });
 
 app.use("/api/", apiLimiter);
-
-// Apply rate limiting to API routes
-app.use("/api/", apiLimiter);
-
-
 // ===============================
 // TEST ROUTE
 // ===============================
