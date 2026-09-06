@@ -1,6 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
-
+import api from "../api";
 function CropDisease() {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -65,8 +64,8 @@ function CropDisease() {
 
       const token = localStorage.getItem("token");
 
-const response = await axios.post(
-  "http://localhost:3000/api/disease-detection",
+const response = await api.post(
+  "/api/disease-detection",
   formData,
   {
     headers: {
