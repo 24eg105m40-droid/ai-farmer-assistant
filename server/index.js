@@ -23,10 +23,11 @@ const upload = multer({ dest: "uploads/" });
 // ===============================
 // SECURITY & MIDDLEWARE
 // ===============================
-  const allowedOrigins = [
-  "https://ai-farmer-assistant-6or6v4mhx-rebels9.vercel.app"
-];
-
+  const allowedOrigins = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN
+      .split(",")
+      .map((origin) => origin.trim())
+  : [];
 app.use(
   cors({
     origin: allowedOrigins,
